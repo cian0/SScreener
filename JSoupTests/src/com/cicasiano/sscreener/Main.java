@@ -13,6 +13,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import com.almworks.sqlite4java.SQLiteException;
 import com.cicasiano.sscreener.dao.FinancialsDAO;
 import com.cicasiano.sscreener.dao.SecurityDAO;
 import com.cicasiano.sscreener.dao.SecurityStatsDAO;
@@ -92,11 +93,11 @@ public class Main {
 
 			stat.setStatID(statID);
 			stat.setSymbol(security.getSymbolCode());
-			if (row.getAllElements().size() == 3)
+			if (row.getAllElements().size() >= 3)
 				stat.setValCompany(row.getAllElements().get(2).text());
-			if (row.getAllElements().size() == 4)
+			if (row.getAllElements().size() >= 4)
 				stat.setValIndustry(row.getAllElements().get(3).text());
-			if (row.getAllElements().size() == 5)
+			if (row.getAllElements().size() >= 5)
 			stat.setValSector(row.getAllElements().get(4).text());
 			ssDAO.insertStatsForSecurity(stat);
 		}
@@ -109,7 +110,12 @@ public class Main {
 			Elements tables = doc.getElementsByTag("table");
 			System.out.print("List length : " + tables.size() + "\n");
 			String reutersURL;
-			
+			try {
+				SQLite4jWrapper.getInstance().exec("DELETE FROM SecurityStats");
+			} catch (SQLiteException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
 			Element symbolElem;
 			for (int i =0 ; i < tables.size(); i++){
 				// from table > tbody > tr 	
