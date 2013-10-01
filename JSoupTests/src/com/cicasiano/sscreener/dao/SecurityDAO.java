@@ -13,7 +13,7 @@ public class SecurityDAO {
 		db = SQLite4jWrapper.getInstance();
 		if (db.open()){
 			try {
-				String query = "INSERT INTO " + Securities.TABLE_NAME + " (" + 
+				String query = "INSERT OR REPLACE INTO " + Securities.TABLE_NAME + " (" + 
 						Securities.C_FULL_MARKET_CAP + ", " +
 						Securities.C_LAST_TRADE_DATE + ", " + 
 						Securities.C_LAST_TRADE_PRICE + ", " + 
@@ -39,7 +39,6 @@ public class SecurityDAO {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			
 		}
 	}
 

@@ -44,23 +44,29 @@ public class SQLite4jWrapper implements Serializable {
 		return false;
 	}
 	
+	public int queryWithIntResult (String query) throws SQLiteException{
+		open();
+		int result = -1;
+		SQLiteStatement stmt = db.prepare(query);
+		while (stmt.step()){
+			result = stmt.columnInt(0);
+		}
+		return result;
+	}
+	
 	private void initiateDBSchema(SQLiteConnection db){
-//		int userVersion = SQLite4jWrapper.USER_VERSION;
 		int currentDBVersion = -1;
 		try {
-			SQLiteStatement stmt = db.prepare("PRAGMA user_version");
-			while (stmt.step()){
-				currentDBVersion = stmt.columnInt(0);
-				System.out.println("CURRENT DB VERSION : " + currentDBVersion);
-			}
+			currentDBVersion = queryWithIntResult("PRAGMA user_version");
+			System.out.println("CURRENT DB VERSION : " + currentDBVersion);
 			if (currentDBVersion < 1)
 				v1Updates(db);
 			
-			
-		} catch (SQLiteException e) {
+		} catch (SQLiteException e1) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			e1.printStackTrace();
 		}
+		
 	}
 	public void close(){
 		if (db != null)
@@ -71,8 +77,7 @@ public class SQLite4jWrapper implements Serializable {
 		}
 	}
 	public SQLiteStatement prepare (String sql) throws SQLiteException{
-		Tracer.trace("SQL : " + sql);
-		Tracer.trace("db " + db);
+		Tracer.trace("query : " + sql);
 		return db.prepare(sql);
 	}
 	public int insertUniqueAndRetrieveID(){

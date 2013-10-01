@@ -12,11 +12,13 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import com.almworks.sqlite4java.SQLiteConnection;
-import com.almworks.sqlite4java.SQLiteException;
+import com.cicasiano.sscreener.dao.FinancialsDAO;
 import com.cicasiano.sscreener.dao.SecurityDAO;
+import com.cicasiano.sscreener.dao.SecurityStatsDAO;
 import com.cicasiano.sscreener.model.SQLite4jWrapper;
+import com.cicasiano.sscreener.utils.Tracer;
 import com.cicasiano.sscreener.vos.Security;
+import com.cicasiano.sscreener.vos.Stat;
 public class Main {
 	
 	private static final String PSE_URL = "http://www.pse.com.ph/stockMarket/";
@@ -76,14 +78,16 @@ public class Main {
 		SQLite4jWrapper.getInstance().open();
 		try {
 			Document doc = parseFromFile();
-			String link;
 			Elements tables = doc.getElementsByTag("table");
 			System.out.print("List length : " + tables.size() + "\n");
 			String reutersURL;
 			Security security = new Security();
 			SecurityDAO sDAO = new SecurityDAO();
+			FinancialsDAO fDAO = new FinancialsDAO();
+			SecurityStatsDAO ssDAO = new SecurityStatsDAO();
 			NumberFormat nf = NumberFormat.getInstance(Locale.US);
-			
+			Stat stat = new Stat();
+			Element symbolElem;
 			for (int i =0 ; i < tables.size(); i++){
 				// from table > tbody > tr 	
 				
@@ -99,37 +103,29 @@ public class Main {
 				//7 Full Market Capitalization
 				//8 % Weight
 				
-				Element secNameElem = tr.child(1);
-				Element symbolElem = tr.child(2); // td > div > a
-				Element symbolLinkElem = symbolElem.child(0).child(0);
-				link = symbolLinkElem.attr("href");
-				Element fullMarketCap = tr.child(6);
+				symbolElem = tr.child(2); // td > div > a
 				
 				if (symbolElem.text().trim().equals("") || symbolElem.text().trim().equals("Symbol"))
 					continue;
 				
-				
-				System.out.print("Security Name : " + secNameElem.text() + " ::: ");
-				System.out.print("Full Market Capitalization : " + fullMarketCap.text() + " ::: ");
-				System.out.print("Sec Link : " + link + " ::: ");
-				System.out.print("Security Symbol : " + symbolElem.text() + "\n");
 				reutersURL = REUTERS_FINANCIAL_URL.replace("***", symbolElem.text());
-				System.out.print("reutersURL : " + reutersURL + "\n");
+				
 				
 				security.setFreeFloatLevel(Double.parseDouble(tr.child(6).text()));
 				try {
 					security.setFreeFloatMarketCap((nf.parse(tr.child(7).text()).longValue()));
 				} catch (ParseException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				security.setLastTradeDate(tr.child(3).text());
-				security.setLastTradePrice(new BigDecimal(tr.child(4).text()));
-				
+				try {
+					security.setLastTradePrice(new BigDecimal((nf.parse(tr.child(4).text()).doubleValue())));
+				} catch (ParseException e1) {
+					e1.printStackTrace();
+				}
 				try {
 					security.setOutstandingShares((nf.parse(tr.child(5).text()).longValue()));
 				} catch (ParseException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
@@ -140,16 +136,41 @@ public class Main {
 				
 				Document reutersDoc = Jsoup.connect(reutersURL).get();
 				Elements el = reutersDoc.getElementsByTag("tr").select(".stripe");
-				System.out.print(" : " + el.toString() + "\n");
+//				System.out.print(" : " + el.toString() + "\n");
+				for (int j = 0 ; j < el.size(); j++){
+					Element row = el.get(j);
+					String statName = row.getAllElements().get(1).text().trim(); // Stat name
+					Tracer.trace("\nstatName : " + statName);
+//					String valueComp, valueIndustry, valueSector;
+					
+//					valueComp = row.getAllElements().get(2).text();
+//					valueIndustry = row.getAllElements().get(3).text();
+//					valueSector = row.getAllElements().get(4).text();
+//					
+//					Tracer.trace("valueComp : " + valueComp);
+//					Tracer.trace("valueIndustry : " + valueIndustry);
+//					Tracer.trace("valueSector : " + valueSector);
+					
+					int statID = fDAO.insertSecurityStatAndGetID(statName);
+					Tracer.trace("stat id : " + statID);
+					stat.setStatID(statID);
+					stat.setSymbol(security.getSymbolCode());
+					if (row.getAllElements().size() == 3)
+						stat.setValCompany(row.getAllElements().get(2).text());
+					if (row.getAllElements().size() == 4)
+						stat.setValIndustry(row.getAllElements().get(3).text());
+					if (row.getAllElements().size() == 5)
+					stat.setValSector(row.getAllElements().get(4).text());
+					ssDAO.insertStatsForSecurity(stat);
+				}
+//				break;
 				
-				break;
-				
-//				writeToFile(divs.get(i));
 			}
 			
 
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		SQLite4jWrapper.getInstance().close();
 	}
 }
