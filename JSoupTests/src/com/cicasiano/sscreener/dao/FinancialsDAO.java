@@ -26,7 +26,6 @@ public class FinancialsDAO {
 				selStmt.bind(1, statName);
 				
 				while (selStmt.step()){
-					
 					id = selStmt.columnInt(0);
 					break;
 				}

@@ -77,7 +77,7 @@ public class SQLite4jWrapper implements Serializable {
 		}
 	}
 	public SQLiteStatement prepare (String sql) throws SQLiteException{
-		Tracer.trace("query : " + sql);
+//		Tracer.trace("query : " + sql);
 		return db.prepare(sql);
 	}
 	public int insertUniqueAndRetrieveID(){

@@ -3,6 +3,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Locale;
@@ -28,6 +29,14 @@ public class Main {
 	private static final boolean USE_PROXIES = true;
 	private static final String STOCK_LIST_SOURCE_FILE = "assets/markets.html";
 	
+	private static final String WRITE_LOGS_TO_FILE = "assets/logs.txt";
+	private static Security security = new Security();
+	private static SecurityDAO sDAO = new SecurityDAO();
+	private static FinancialsDAO fDAO = new FinancialsDAO();
+	private static SecurityStatsDAO ssDAO = new SecurityStatsDAO();
+	private static NumberFormat nf = NumberFormat.getInstance(Locale.US);
+	private static Stat stat = new Stat();
+	
 	private static final String REUTERS_FINANCIAL_URL = "http://www.reuters.com/finance/stocks/financialHighlights?symbol=***.PS";
 	public static void getFromDocAndPrint (Document doc, String id){
 		System.out.println("getFromDocAndPrint : " + doc.getElementById(id));
@@ -38,7 +47,7 @@ public class Main {
 	public static void writeToFile(String element){
 		try
 		{
-		    String filename= "assets/MyFile.txt";
+		    String filename= WRITE_LOGS_TO_FILE;
 		    FileWriter fw = new FileWriter(filename,true); //the true will append the new data
 		    fw.write(element +"\n");//appends the string to the file
 		    fw.close();
@@ -51,7 +60,7 @@ public class Main {
 	public static void writeToFile(Element element){
 		try
 		{
-		    String filename= "assets/MyFile2.txt";
+		    String filename= WRITE_LOGS_TO_FILE;
 		    FileWriter fw = new FileWriter(filename,true); //the true will append the new data
 		    fw.write(element +"\n");//appends the string to the file
 		    fw.close();
@@ -73,6 +82,25 @@ public class Main {
 		System.setProperty("http.proxyHost", PROXY);
 		System.setProperty("http.proxyPort", PORT);
 	}
+	private static void parseFinancialsFromDocument(Document doc){
+		Elements el = doc.getElementsByTag("tr").select(".stripe");
+		for (int j = 0 ; j < el.size(); j++){
+			Element row = el.get(j);
+			String statName = row.getAllElements().get(1).text().trim(); // Stat name
+			
+			int statID = fDAO.insertSecurityStatAndGetID(statName);
+
+			stat.setStatID(statID);
+			stat.setSymbol(security.getSymbolCode());
+			if (row.getAllElements().size() == 3)
+				stat.setValCompany(row.getAllElements().get(2).text());
+			if (row.getAllElements().size() == 4)
+				stat.setValIndustry(row.getAllElements().get(3).text());
+			if (row.getAllElements().size() == 5)
+			stat.setValSector(row.getAllElements().get(4).text());
+			ssDAO.insertStatsForSecurity(stat);
+		}
+	}
 	public static void main (String [] args){
 		setupProxies();
 		SQLite4jWrapper.getInstance().open();
@@ -81,12 +109,7 @@ public class Main {
 			Elements tables = doc.getElementsByTag("table");
 			System.out.print("List length : " + tables.size() + "\n");
 			String reutersURL;
-			Security security = new Security();
-			SecurityDAO sDAO = new SecurityDAO();
-			FinancialsDAO fDAO = new FinancialsDAO();
-			SecurityStatsDAO ssDAO = new SecurityStatsDAO();
-			NumberFormat nf = NumberFormat.getInstance(Locale.US);
-			Stat stat = new Stat();
+			
 			Element symbolElem;
 			for (int i =0 ; i < tables.size(); i++){
 				// from table > tbody > tr 	
@@ -133,38 +156,20 @@ public class Main {
 				security.setSecurityName((tr.child(1).text()));
 				security.setSymbolCode((tr.child(2).text()));
 				sDAO.saveSymbol(security);
-				
-				Document reutersDoc = Jsoup.connect(reutersURL).get();
-				Elements el = reutersDoc.getElementsByTag("tr").select(".stripe");
-//				System.out.print(" : " + el.toString() + "\n");
-				for (int j = 0 ; j < el.size(); j++){
-					Element row = el.get(j);
-					String statName = row.getAllElements().get(1).text().trim(); // Stat name
-					Tracer.trace("\nstatName : " + statName);
-//					String valueComp, valueIndustry, valueSector;
+				Tracer.trace("Parsing : " + reutersURL);
+				try{
+					Document reutersDoc = Jsoup.connect(reutersURL).timeout(20000).get();	
+					parseFinancialsFromDocument(reutersDoc);
+//					break;
 					
-//					valueComp = row.getAllElements().get(2).text();
-//					valueIndustry = row.getAllElements().get(3).text();
-//					valueSector = row.getAllElements().get(4).text();
-//					
-//					Tracer.trace("valueComp : " + valueComp);
-//					Tracer.trace("valueIndustry : " + valueIndustry);
-//					Tracer.trace("valueSector : " + valueSector);
-					
-					int statID = fDAO.insertSecurityStatAndGetID(statName);
-					Tracer.trace("stat id : " + statID);
-					stat.setStatID(statID);
-					stat.setSymbol(security.getSymbolCode());
-					if (row.getAllElements().size() == 3)
-						stat.setValCompany(row.getAllElements().get(2).text());
-					if (row.getAllElements().size() == 4)
-						stat.setValIndustry(row.getAllElements().get(3).text());
-					if (row.getAllElements().size() == 5)
-					stat.setValSector(row.getAllElements().get(4).text());
-					ssDAO.insertStatsForSecurity(stat);
+				}catch (SocketTimeoutException e){
+					Tracer.trace("TIMEOUT FOR : " + reutersURL);
+					writeToFile(reutersURL);
+					writeToFile(e.getStackTrace().toString());
+					e.printStackTrace();
 				}
-//				break;
-				
+
+			
 			}
 			
 
