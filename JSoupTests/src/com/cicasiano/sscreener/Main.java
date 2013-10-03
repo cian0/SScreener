@@ -3,11 +3,15 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.CookieHandler;
+import java.net.CookieManager;
 import java.net.SocketTimeoutException;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Locale;
 
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -25,8 +29,8 @@ public class Main {
 	
 	private static final String PSE_URL = "http://www.pse.com.ph/stockMarket/";
 	private static final String ENCODING = "UTF-8";
-	private static final String PROXY = "gateway.zscaler.net";
-	private static final String PORT = "9400";
+	public static final String PROXY = "gateway.zscaler.net";
+	public static final String PORT = "9400";
 	private static final boolean USE_PROXIES = true;
 	private static final String STOCK_LIST_SOURCE_FILE = "assets/markets.html";
 	
@@ -37,6 +41,8 @@ public class Main {
 	private static SecurityStatsDAO ssDAO = new SecurityStatsDAO();
 	private static NumberFormat nf = NumberFormat.getInstance(Locale.US);
 	private static Stat stat = new Stat();
+	private static final String PSE_REQ_URL = "http://www.pse.com.ph/stockMarket/marketInfo-marketActivity-indicesComposition.html?method=getCompositionIndices&ajax=true";
+	private static final String USER_AGENT = "Mozilla/5.0";
 	
 	private static final String REUTERS_FINANCIAL_URL = "http://www.reuters.com/finance/stocks/financialHighlights?symbol=***.PS";
 	public static void getFromDocAndPrint (Document doc, String id){
@@ -44,7 +50,16 @@ public class Main {
 		System.out.println("getFromDocAndPrint inner html : " + doc.getElementById(id).html());
 		
 	}
-	
+	// HTTP POST request
+	private static void sendPost() {
+		try {
+			new PSEHTTPClient();
+		} catch (IllegalStateException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+ 
+	}
 	public static void writeToFile(String element){
 		try
 		{
@@ -104,6 +119,7 @@ public class Main {
 	}
 	public static void main (String [] args){
 		setupProxies();
+		sendPost();
 		SQLite4jWrapper.getInstance().open();
 		try {
 			Document doc = parseFromFile();
